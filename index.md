@@ -1,6 +1,5 @@
 ---
 layout: home
-title: 这里是 Log7c666 的主页
 ---
 
 <div class="home-hero">
