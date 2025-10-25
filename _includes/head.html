@@ -1,10 +1,11 @@
+<!-- 自定义样式 -->
+<link rel="stylesheet" href="/assets/css/custom.css">
+<link rel="icon" href="/assets/img/favicon.png">
+
 {% if page.mathjax or site.mathjax %}
 <script>
   window.MathJax = {
-    tex: {
-      inlineMath: [['$', '$'], ['\\(', '\\)']],
-      displayMath: [['$$','$$'], ['\\[','\\]']]
-    },
+    tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$','$$'], ['\\[','\\]']] },
     svg: { fontCache: 'global' }
   };
 </script>
