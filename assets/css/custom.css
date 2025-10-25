@@ -71,3 +71,6 @@ a:hover{ text-decoration:underline; }
 
 /* 页脚淡化 */
 .site-footer{ color:var(--muted); }
+
+.site-title{ display:none; }
+
