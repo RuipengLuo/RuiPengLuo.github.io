@@ -1,0 +1,23 @@
+title: 我的CV/ML笔记
+description: 记录 Faster R-CNN、MMDetection、控制与电路等实践
+theme: minima
+
+# Markdown & 数学
+markdown: kramdown
+kramdown:
+  input: GFM
+  math_engine: mathjax
+  syntax_highlighter: rouge
+
+# 插件（GitHub Pages 官方白名单）
+plugins:
+  - jekyll-feed
+  - jekyll-seo-tag
+
+# 导航（可选）
+minima:
+  social_links:
+    - { platform: github,  user_url: "https://github.com/你的用户名" }
+
+# 代码高亮主题（可改为 'monokai' 等）
+highlighter: rouge
