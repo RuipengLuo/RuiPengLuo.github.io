@@ -35,7 +35,10 @@ Image → Backbone(ResNet) → Neck(FPN: P2…P6)
 
 ## 2. Backbone
 
-> *可放图位*：`![Backbone整体流程框图]({{ '/assets/img/image-2.png' | relative_url }})`
+<p align="center">
+  <img src="{{ '/assets/img/image-2.png' | relative_url }}" alt="Backbone 整体流程"
+       width="680" loading="lazy" decoding="async">
+</p>
 
 ### 2.1 ResNet50（Stem → Stages）
 - **输入**：RGB 图像（如 224×224）
