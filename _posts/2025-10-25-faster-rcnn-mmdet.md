@@ -18,8 +18,8 @@ mathjax: true
 
 ```
 Image → Backbone(ResNet) → Neck(FPN: P2…P6)
-                        → RPN (cls: 前景/背景, reg: Δ)
-                      proposals(Top-K) ──→ RoIAlign(选层/对齐采样 7×7)
+                         → RPN (cls: 前景/背景, reg: Δ)  ──→  outputs:proposals(Top-K)
+                         → RoIAlign(选层/对齐采样 7×7)
                                            → BBox Head (分类 cls + 回归 reg)
                                            → Δ 解码 → per-class NMS → det_bboxes, det_labels
 ```
@@ -34,6 +34,8 @@ Image → Backbone(ResNet) → Neck(FPN: P2…P6)
 ---
 
 ## 2. Backbone
+
+> *可放图位*：`![Backbone整体流程框图]({{ '/assets/img/image-2.png' | relative_url }})`
 
 ### 2.1 ResNet50（Stem → Stages）
 - **输入**：RGB 图像（如 224×224）
@@ -59,13 +61,13 @@ $$
 
 ### 3.2 侧向 & 自顶向下融合（代码片段）
 ```python
-# 侧向 1x1 conv
-laterals = [lateral_conv(x) for lateral_conv, x in zip(self.lateral_convs, inputs)]
-
-# top-down 融合
-for i in range(len(laterals) - 1, 0, -1):
-    size = laterals[i - 1].shape[2:]
-    laterals[i - 1] = laterals[i - 1] + F.interpolate(laterals[i], size=size, **self.upsample_cfg)
+    # 侧向 1x1 conv
+    laterals = [lateral_conv(x) for lateral_conv, x in zip(self.lateral_convs, inputs)]
+    
+    # top-down 融合
+    for i in range(len(laterals) - 1, 0, -1):
+        size = laterals[i - 1].shape[2:]
+        laterals[i - 1] = laterals[i - 1] + F.interpolate(laterals[i], size=size, **self.upsample_cfg)
 ```
 
 - 输出形状示例（B=1）：`P2..P6 = [1, 256, 128,128] … [1,256, 8,8]`（以 1024×1024 为例）。
@@ -78,11 +80,11 @@ for i in range(len(laterals) - 1, 0, -1):
 
 ### 4.1 前向（单层）
 ```python
-def forward_single(self, x):
-    x = self.rpn_conv(x); x = F.relu(x)
-    rpn_cls_score = self.rpn_cls(x)  # (N, A, H, W)  —— use_sigmoid=True → A；Softmax → 2A
-    rpn_bbox_pred = self.rpn_reg(x)  # (N, 4A, H, W)
-    return rpn_cls_score, rpn_bbox_pred
+    def forward_single(self, x):
+        x = self.rpn_conv(x); x = F.relu(x)
+        rpn_cls_score = self.rpn_cls(x)  # (N, A, H, W)  —— use_sigmoid=True → A；Softmax → 2A
+        rpn_bbox_pred = self.rpn_reg(x)  # (N, 4A, H, W)
+        return rpn_cls_score, rpn_bbox_pred
 ```
 
 - **通道说明**：Sigmoid 情况下分类通道为 `A`；Softmax 为 `2A`。回归恒为 `4A`。  
@@ -93,9 +95,10 @@ def forward_single(self, x):
 2. **unmap 回填**：把只在有效锚上计算的 targets/weights 回到“全部锚”长度  
 3. **损失**：
    - 分类（Sigmoid）  
-     $$\ell_{\text{cls}} = -\frac{1}{\text{avg\_factor}}\sum_i \big[y_i\log p_i+(1-y_i)\log (1-p_i)\big]$$
+       $$\ell_{\text{cls}} = -\frac{1}{\text{avg\_factor}}\sum_i \big[y_i\log p_i+(1-y_i)\log (1-p_i)\big]$$
+     
    - 回归（Smooth L1, \(\beta=1/9\)）  
-     $$\ell_{\beta}(x)=\begin{cases}\frac{0.5x^2}{\beta}&|x|<\beta\\ |x|-0.5\beta&\text{otherwise}\end{cases}$$
+       $$\ell_{\beta}(x)=\begin{cases}\frac{0.5x^2}{\beta}&|x|<\beta\\ |x|-0.5\beta&\text{otherwise}\end{cases}$$
 
 ### 4.3 推理
 - `permute+reshape` → Sigmoid 得分 → `nms_pre` 预筛 → `delta` 解码 → 过滤小框 → NMS → `max_per_img` 截断。
@@ -113,11 +116,11 @@ def forward_single(self, x):
 
 ### 5.2 选层与对齐（SingleRoIExtractor）
 ```python
-# 选层：小框→低层（细），大框→高层（粗）
-target_lvl = clip(floor(log2(sqrt(w*h)/finest_scale)), 0, L-1)   # 常用 finest_scale=56
-
-# RoIAlign 得到 (N, C, 7, 7)
-roi_feats = self.roi_layers[i](feats[i], rois_)
+    # 选层：小框→低层（细），大框→高层（粗）
+    target_lvl = clip(floor(log2(sqrt(w*h)/finest_scale)), 0, L-1)   # 常用 finest_scale=56
+    
+    # RoIAlign 得到 (N, C, 7, 7)
+    roi_feats = self.roi_layers[i](feats[i], rois_)
 ```
 
 ### 5.3 BBoxHead
@@ -182,34 +185,34 @@ $$
 ## 8. “配置 → 形状”的快速映射
 
 ```python
-# 典型 MMDetection 配置片段（Python 字典风格）
-model = dict(
-    type='FasterRCNN',
-    neck=dict(type='FPN', num_outs=5),  # → P2..P6, strides=[4, 8, 16, 32, 64]
-    rpn_head=dict(
-        type='RPNHead',
-        anchor_generator=dict(
-            scales=[8], ratios=[0.5, 1.0, 2.0], strides=[4, 8, 16, 32, 64]
+    # 典型 MMDetection 配置片段（Python 字典风格）
+    model = dict(
+        type='FasterRCNN',
+        neck=dict(type='FPN', num_outs=5),  # → P2..P6, strides=[4, 8, 16, 32, 64]
+        rpn_head=dict(
+            type='RPNHead',
+            anchor_generator=dict(
+                scales=[8], ratios=[0.5, 1.0, 2.0], strides=[4, 8, 16, 32, 64]
+            ),
+            # → 每层 A = len(scales) * len(ratios) = 3
+            bbox_coder=dict(
+                type='DeltaXYWHBBoxCoder', target_stds=[0.1, 0.1, 0.2, 0.2]
+            ),
         ),
-        # → 每层 A = len(scales) * len(ratios) = 3
-        bbox_coder=dict(
-            type='DeltaXYWHBBoxCoder', target_stds=[0.1, 0.1, 0.2, 0.2]
+        roi_head=dict(
+            type='StandardRoIHead',
+            bbox_roi_extractor=dict(
+                type='SingleRoIExtractor',
+                roi_layer=dict(type='RoIAlign', output_size=7),
+                featmap_strides=[4, 8, 16, 32],
+            ),
+            bbox_head=dict(
+                type='Shared2FCBBoxHead',
+                num_classes=NUM,
+                reg_class_agnostic=False  # False→bbox_pred.shape[1] = 4*NUM；True→4
+            ),
         ),
-    ),
-    roi_head=dict(
-        type='StandardRoIHead',
-        bbox_roi_extractor=dict(
-            type='SingleRoIExtractor',
-            roi_layer=dict(type='RoIAlign', output_size=7),
-            featmap_strides=[4, 8, 16, 32],
-        ),
-        bbox_head=dict(
-            type='Shared2FCBBoxHead',
-            num_classes=NUM,
-            reg_class_agnostic=False  # False→bbox_pred.shape[1] = 4*NUM；True→4
-        ),
-    ),
-)
+    )
 ```
 
 - `cls_score.shape = [R, NUM + 1]`（softmax 多分类 + 背景）
@@ -242,22 +245,22 @@ $$
 
 **在 `RPNHead.forward()` 中**
 ```python
-print("[RPN] feat shapes:", [f.shape for f in x])
-print("[RPN] cls per level:", [s.shape for s in cls_scores])
-print("[RPN] reg per level:", [b.shape for b in bbox_preds])
+    print("[RPN] feat shapes:", [f.shape for f in x])
+    print("[RPN] cls per level:", [s.shape for s in cls_scores])
+    print("[RPN] reg per level:", [b.shape for b in bbox_preds])
 ```
 
 **在 `StandardRoIHead._bbox_forward()` / `predict()` 中**
 ```python
-print("[RoI] rois:", rois.shape)               # (N,5) = [batch,x1,y1,x2,y2]
-print("[RoI] bbox_feats:", bbox_feats.shape)   # (N,256,7,7)
-print("[RoI] cls_score:", cls_score.shape, "bbox_pred:", bbox_pred.shape)
+    print("[RoI] rois:", rois.shape)               # (N,5) = [batch,x1,y1,x2,y2]
+    print("[RoI] bbox_feats:", bbox_feats.shape)   # (N,256,7,7)
+    print("[RoI] cls_score:", cls_score.shape, "bbox_pred:", bbox_pred.shape)
 ```
 
 **NMS 前后对比（单图）**
 ```python
-print("[Post] before nms:", bboxes.shape, scores.shape)
-print("[Post] after nms:", results.bboxes.shape, results.scores.shape)
+    print("[Post] before nms:", bboxes.shape, scores.shape)
+    print("[Post] after nms:", results.bboxes.shape, results.scores.shape)
 ```
 
 ---
