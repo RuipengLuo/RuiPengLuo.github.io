@@ -35,16 +35,23 @@ Image → Backbone(ResNet) → Neck(FPN: P2…P6)
 
 ## 2. Backbone
 
-<p align="center">
-  <img src="{{ '/assets/img/image-2.png' | relative_url }}" alt="Backbone 整体流程"
-       width="680" loading="lazy" decoding="async">
-</p>
+<figure>
+  <img src="{{ '/assets/img/backbone_all_level.png' | relative_url }}"
+       alt="FPN 融合示意" loading="lazy" decoding="async">
+  <figcaption>图 1：Backbone 整体流程。</figcaption>
+</figure>
 
 ### 2.1 ResNet50（Stem → Stages）
 - **输入**：RGB 图像（如 224×224）
 - **Stem**：7×7 Conv (stride=2, out=64) → BN → ReLU → 3×3 MaxPool (s=2)
 - **Stages**：4 个 stage（Bottleneck 堆叠），常见层数 (3, 4, 6, 3)
 - **Bottleneck**：`1×1 降维 → 3×3 提特征 → 1×1 升维`，残差连接相加后 ReLU。
+
+<figure>
+  <img src="{{ '/assets/img/ResNet_structure.png' | relative_url }}"
+       alt="FPN 融合示意" loading="lazy" decoding="async">
+  <figcaption>图 1：Backbone 整体流程。</figcaption>
+</figure>
 
 **BN 公式（训练期）**：
 $$
@@ -57,6 +64,13 @@ $$
 ---
 
 ## 3. Neck（FPN）
+
+<figure>
+  <img src="{{ '/assets/img/FPN_born.png' | relative_url }}"
+       alt="FPN 融合示意" loading="lazy" decoding="async">
+  <figcaption>图 1：Backbone 整体流程。</figcaption>
+</figure>
+
 
 ### 3.1 输入/输出
 - 以 ResNet50 为例，输入通道约 `[256, 512, 1024, 2048]`（对应 `C2..C5`）。
@@ -73,6 +87,12 @@ $$
         laterals[i - 1] = laterals[i - 1] + F.interpolate(laterals[i], size=size, **self.upsample_cfg)
 ```
 
+<figure>
+  <img src="{{ '/assets/img/FPN_details.png' | relative_url }}"
+       alt="FPN 融合示意" loading="lazy" decoding="async">
+  <figcaption>图 1：Backbone 整体流程。</figcaption>
+</figure>
+
 - 输出形状示例（B=1）：`P2..P6 = [1, 256, 128,128] … [1,256, 8,8]`（以 1024×1024 为例）。
 
 > *可放图位*：`![FPN 融合示意]({{ '/assets/img/2025-10-26/fpn.png' | relative_url }})`
@@ -80,6 +100,13 @@ $$
 ---
 
 ## 4. RPN
+
+<figure>
+  <img src="{{ '/assets/img/FPN_to_resnet.png' | relative_url }}"
+       alt="FPN 融合示意" loading="lazy" decoding="async">
+  <figcaption>图 1：Backbone 整体流程。</figcaption>
+</figure>
+
 
 ### 4.1 前向（单层）
 ```python
@@ -151,7 +178,7 @@ $$
 
 > 短边缩放到 800，并 **Pad 到 32 的倍数**。例：`H=800, W=1333 → PadW=1344`。
 
-| 层 | stride | 空间尺寸 (Hi×Wi) | 每层锚框数 `A*Hi*Wi`（A=3） |
+| 层     | stride     | 空间尺寸 (Hi×Wi)     | 每层锚框数 `A*Hi*Wi`（A=3）     |
 |---|---:|---:|---:|
 | P2 | 4  | 200×336 | 201,600 |
 | P3 | 8  | 100×168 | 50,400 |
