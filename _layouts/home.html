@@ -1,0 +1,31 @@
+---
+layout: default
+---
+
+<div class="home">
+  {%- if page.title -%}
+    <h1 class="page-heading">{{ page.title }}</h1>
+  {%- endif -%}
+
+  <!-- 首页正文（index.md 里的内容） -->
+  {{ content }}
+
+  {%- if site.posts.size > 0 -%}
+    <h2 class="post-list-heading">{{ page.list_title | default: "最近文章" }}</h2>
+    <ul class="post-list">
+      {%- for post in site.posts -%}
+        <li>
+          <span class="post-meta">{{ post.date | date: "%Y年%-m月%-d日" }}</span>
+          <h3>
+            <a class="post-link" href="{{ post.url | relative_url }}">{{ post.title | escape }}</a>
+          </h3>
+          {%- if site.show_excerpts -%}
+            <div class="post-excerpt">{{ post.excerpt }}</div>
+          {%- endif -%}
+        </li>
+      {%- endfor -%}
+    </ul>
+  {%- endif -%}
+
+  <!-- 去掉了 minima 原本的 RSS 提示 -->
+</div>
