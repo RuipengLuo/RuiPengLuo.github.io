@@ -72,5 +72,14 @@ a:hover{ text-decoration:underline; }
 /* 页脚淡化 */
 .site-footer{ color:var(--muted); }
 
-.site-title{ display:none; }
+/* 首页隐藏整个站点头部（标题/汉堡/导航） */
+.home .site-header { display: none; }
+
+/* 首页去掉顶部多余留白 */
+.home .page-content { padding-top: 0; }
+
+/* 首页隐藏“Posts”和 RSS 提示（如果还在） */
+.post-list-heading { display: none; }
+.rss-subscribe { display: none; }
+
 
