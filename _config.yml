@@ -14,7 +14,7 @@ show_excerpts: true              # 首页显示摘要
 minima:
   skin: auto                     # 跟随系统深浅色
   social_links:
-    - { platform: github, user_url: "https://github.com/你的用户名" }
+    - { platform: github, user_url: "https://github.com/RuiPengLuo" }
 header_pages:                    # 顶部导航
   - about.md
 
