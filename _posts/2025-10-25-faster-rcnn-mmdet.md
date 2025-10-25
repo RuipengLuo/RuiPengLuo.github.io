@@ -14,8 +14,8 @@ mathjax: true
 
 ```
 Image → Backbone(ResNet) → Neck(FPN: P2…P6)
-                        → RPN (cls: 前景/背景, reg: Δ)
-                      proposals(Top-K) ──→ RoIAlign(选层/对齐采样 7×7)
+                         → RPN (cls: 前景/背景, reg: Δ)   ──→  outputs： proposals(Top-K)
+                         → RoIAlign(选层/对齐采样 7×7)
                                            → BBox Head (分类 cls + 回归 reg)
                                            → Δ 解码 → per-class NMS → det_bboxes, det_labels
 ```
