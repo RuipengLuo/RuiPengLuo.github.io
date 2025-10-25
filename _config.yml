@@ -21,3 +21,5 @@ minima:
 
 # 代码高亮主题（可改为 'monokai' 等）
 highlighter: rouge
+
+mathjax: true
