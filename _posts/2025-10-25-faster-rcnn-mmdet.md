@@ -35,9 +35,11 @@ Image → Backbone(ResNet) → Neck(FPN: P2…P6)
 
 ## 2. Backbone
 
-<figure>
+<figure style="max-width:720px;margin:0 auto;">
   <img src="{{ '/assets/img/backbone_all_level.png' | relative_url }}"
-       alt="FPN 融合示意" loading="lazy" decoding="async">
+       alt="FPN 融合示意"
+       loading="lazy" decoding="async"
+       style="width:100%;height:auto;display:block;">
   <figcaption>图 1：Backbone 整体流程。</figcaption>
 </figure>
 
