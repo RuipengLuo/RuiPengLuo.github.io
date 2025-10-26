@@ -40,7 +40,7 @@ Image → Backbone(ResNet) → Neck(FPN: P2…P6)
        alt="FPN 融合示意"
        loading="lazy" decoding="async"
        style="width:100%;height:auto;display:block;">
-  <figcaption>图 1：Backbone 整体流程。</figcaption>
+  <figcaption>图 1：Backbone 整体流程</figcaption>
 </figure>
 
 ### 2.1 ResNet50（Stem → Stages）
@@ -49,10 +49,12 @@ Image → Backbone(ResNet) → Neck(FPN: P2…P6)
 - **Stages**：4 个 stage（Bottleneck 堆叠），常见层数 (3, 4, 6, 3)
 - **Bottleneck**：`1×1 降维 → 3×3 提特征 → 1×1 升维`，残差连接相加后 ReLU。
 
-<figure>
+<figure style="max-width:720px;margin:0 auto;">
   <img src="{{ '/assets/img/ResNet_structure.png' | relative_url }}"
-       alt="FPN 融合示意" loading="lazy" decoding="async">
-  <figcaption>图 1：Backbone 整体流程。</figcaption>
+       alt="FPN 融合示意"
+       loading="lazy" decoding="async"
+       style="width:100%;height:auto;display:block;">
+  <figcaption>图 2：ResNet 结构</figcaption>
 </figure>
 
 **BN 公式（训练期）**：
@@ -67,12 +69,13 @@ $$
 
 ## 3. Neck（FPN）
 
-<figure>
+<figure style="max-width:720px;margin:0 auto;">
   <img src="{{ '/assets/img/FPN_born.png' | relative_url }}"
-       alt="FPN 融合示意" loading="lazy" decoding="async">
-  <figcaption>图 1：Backbone 整体流程。</figcaption>
+       alt="FPN 融合示意"
+       loading="lazy" decoding="async"
+       style="width:100%;height:auto;display:block;">
+  <figcaption>图 3：FPN 结构对比</figcaption>
 </figure>
-
 
 ### 3.1 输入/输出
 - 以 ResNet50 为例，输入通道约 `[256, 512, 1024, 2048]`（对应 `C2..C5`）。
@@ -89,57 +92,116 @@ $$
         laterals[i - 1] = laterals[i - 1] + F.interpolate(laterals[i], size=size, **self.upsample_cfg)
 ```
 
-<figure>
+<figure style="max-width:720px;margin:0 auto;">
   <img src="{{ '/assets/img/FPN_details.png' | relative_url }}"
-       alt="FPN 融合示意" loading="lazy" decoding="async">
-  <figcaption>图 1：Backbone 整体流程。</figcaption>
+       alt="FPN 融合示意"
+       loading="lazy" decoding="async"
+       style="width:100%;height:auto;display:block;">
+  <figcaption>图 4：FPN 结构</figcaption>
 </figure>
 
 - 输出形状示例（B=1）：`P2..P6 = [1, 256, 128,128] … [1,256, 8,8]`（以 1024×1024 为例）。
-
-> *可放图位*：`![FPN 融合示意]({{ '/assets/img/2025-10-26/fpn.png' | relative_url }})`
 
 ---
 
 ## 4. RPN
 
-<figure>
+<figure style="max-width:720px;margin:0 auto;">
   <img src="{{ '/assets/img/FPN_to_resnet.png' | relative_url }}"
-       alt="FPN 融合示意" loading="lazy" decoding="async">
-  <figcaption>图 1：Backbone 整体流程。</figcaption>
+       alt="FPN 融合示意"
+       loading="lazy" decoding="async"
+       style="width:100%;height:auto;display:block;">
+  <figcaption>图 5：FPN 与 RPN 对接</figcaption>
 </figure>
 
-
 ### 4.1 前向（单层）
+
 ```python
-    def forward_single(self, x):
-        x = self.rpn_conv(x); x = F.relu(x)
-        rpn_cls_score = self.rpn_cls(x)  # (N, A, H, W)  —— use_sigmoid=True → A；Softmax → 2A
-        rpn_bbox_pred = self.rpn_reg(x)  # (N, 4A, H, W)
-        return rpn_cls_score, rpn_bbox_pred
+def forward_single(self, x):
+    x = self.rpn_conv(x)
+    x = F.relu(x)
+    rpn_cls_score = self.rpn_cls(x)  # (N, A, H, W)  —— use_sigmoid=True → A；Softmax → 2A
+    rpn_bbox_pred = self.rpn_reg(x)  # (N, 4A, H, W)
+    return rpn_cls_score, rpn_bbox_pred
 ```
 
-- **通道说明**：Sigmoid 情况下分类通道为 `A`；Softmax 为 `2A`。回归恒为 `4A`。  
-- **形状例**（A=3）：`cls=(1,3,128,128)` 到 `cls=(1,3,8,8)`；`reg=(1,12,128,128)` 到 `reg=(1,12,8,8)`。
+- **通道**：Sigmoid 时分类通道为 `A`；Softmax 为 `2A`；回归恒为 `4A`。  
+- **形状例**（A=3）：`cls=(1,3,128,128)` → 更深层 `cls=(1,3,8,8)`；`reg=(1,12,128,128)` → `reg=(1,12,8,8)`。
 
 ### 4.2 训练（loss）
-1. 生成锚框 `grid_priors(featmap_sizes)` → 过滤图内锚 `inside_flags` → `assigner` → `sampler`  
-2. **unmap 回填**：把只在有效锚上计算的 targets/weights 回到“全部锚”长度  
-3. **损失**：
-   - 分类（Sigmoid）  
-       $$\ell_{\text{cls}} = -\frac{1}{\text{avg\_factor}}\sum_i \big[y_i\log p_i+(1-y_i)\log (1-p_i)\big]$$
-     
-   - 回归（Smooth L1, \(\beta=1/9\)）  
-       $$\ell_{\beta}(x)=\begin{cases}\frac{0.5x^2}{\beta}&|x|<\beta\\ |x|-0.5\beta&\text{otherwise}\end{cases}$$
 
-### 4.3 推理
-- `permute+reshape` → Sigmoid 得分 → `nms_pre` 预筛 → `delta` 解码 → 过滤小框 → NMS → `max_per_img` 截断。
+1. 生成锚：`grid_priors(featmap_sizes)` → `inside_flags` 过滤图内锚 → `assigner` → `sampler`。  
+2. **unmap 回填**：把只在有效锚上算得的 targets/weights 回填到“全部锚”长度。  
+3. **损失**
+   - 分类（Sigmoid BCE）  
+     $$
+     \ell_{\text{cls}}=-\frac{1}{\text{avg\_factor}}\sum_i\big[y_i\log p_i+(1-y_i)\log(1-p_i)\big]
+     $$
+   - 回归（Smooth L1，$\beta=1/9$）  
+     $$
+     \ell_{\beta}(x)=
+     \begin{cases}
+     \dfrac{0.5\,x^2}{\beta}, & |x|<\beta\\[4pt]
+     |x|-0.5\,\beta, & \text{otherwise}
+     \end{cases}
+     $$
 
-> *可放图位*：`![RPN 流程]({{ '/assets/img/2025-10-26/rpn-flow.png' | relative_url }})`
+### 4.3 推理（简）
+
+`permute+reshape → Sigmoid 得分 → nms_pre(Top-K) → δ解码 → 过滤小框 → NMS → max_per_img 截断。`
+
+<figure style="max-width:720px;margin:0 auto;">
+  <img src="{{ '/assets/img/截屏2025-10-25 16.11.01.png' | relative_url }}"
+       alt="Faster R-CNN 两阶段流水线"
+       loading="lazy" decoding="async"
+       style="width:100%;height:auto;display:block;">
+  <figcaption>图 6：Faster R-CNN 的两阶段流水线。</figcaption>
+</figure>
+
+### 4.4 NMS（非极大值抑制）
+
+**目的**：去掉与高分框高度重叠的低分框，避免同一目标被多次检测。
+
+**Hard-NMS（标准）**  
+1) 按分数降序；2) 取最高分框加入结果；3) 丢弃与其 IoU ≥ τ 的其余框；4) 重复直到为空或达 `max_per_img`。
+
+**简洁伪代码（类无关 / RPN）**：
+```python
+def hard_nms(bboxes, scores, iou_thr=0.7, max_per_img=100):
+    order = scores.argsort(descending=True)
+    keep = []
+    while order.numel() and len(keep) < max_per_img:
+        i = order[0]; keep.append(i.item())
+        ious = IoU(bboxes[i], bboxes[order[1:]])      # -> (M,)
+        order = order[1:][(ious < iou_thr).nonzero().squeeze(1)]
+    return keep
+```
+
+- **RPN 阶段**：对 **objectness** 做**类无关** NMS，常配 `nms_pre`（如 1000）降耗。  
+- **BBox Head 阶段**：**逐类**做 NMS，再合并并截断到 `max_per_img`。  
+- **可选**：Soft-NMS 用分数衰减替代“硬删”，更稳但稍慢。
+
+**常用超参**：`score_thr`（低分过滤）、`nms.iou_threshold=τ`、`max_per_img`（如 100），以及（RPN）`nms_pre`。
+
+<figure style="max-width:720px;margin:0 auto;">
+  <img src="{{ '/assets/img/nms.png' | relative_url }}"
+       alt="FPN 融合示意"
+       loading="lazy" decoding="async"
+       style="width:100%;height:auto;display:block;">
+  <figcaption>图 7：NMS过程</figcaption>
+</figure>
 
 ---
 
 ## 5. RoI / RCNN Head
+
+<figure style="max-width:720px;margin:0 auto;">
+  <img src="{{ '/assets/img/man_on_horse.png' | relative_url }}"
+       alt="FPN 融合示意"
+       loading="lazy" decoding="async"
+       style="width:100%;height:auto;display:block;">
+  <figcaption>图 8：Faster R-CNN 的 RoI 头（Head）</figcaption>
+</figure>
 
 ### 5.1 输入
 - FPN 特征 `x=(P2..P6)`  
@@ -154,6 +216,14 @@ $$
     # RoIAlign 得到 (N, C, 7, 7)
     roi_feats = self.roi_layers[i](feats[i], rois_)
 ```
+
+<figure style="max-width:720px;margin:0 auto;">
+  <img src="{{ '/assets/img/roi_align.png' | relative_url }}"
+       alt="FPN 融合示意"
+       loading="lazy" decoding="async"
+       style="width:100%;height:auto;display:block;">
+  <figcaption>图 8：RoI Align示例</figcaption>
+</figure>
 
 ### 5.3 BBoxHead
 - Flatten → 共享 FC（如 2×1024）→  
@@ -171,8 +241,6 @@ $$
 ### 5.4 测试后处理
 - `multiclass_nms`：把 `(N,4K)` reshape 为 `(N,K,4)`，丢背景列，分类别做（Soft-）NMS，输出：  
   `det_bboxes:(M,4+1)`、`det_labels:(M,)`。
-
-> *可放图位*：`![RoIAlign 示意]({{ '/assets/img/2025-10-26/roi-align.png' | relative_url }})`
 
 ---
 
