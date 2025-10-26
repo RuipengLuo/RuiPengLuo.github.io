@@ -28,9 +28,6 @@ Image → Backbone(ResNet) → Neck(FPN: P2…P6)
 - RoIAlign：把 proposals 映射回 FPN 相应层，裁成 7×7 特征块。
 - BBox Head：输出 `cls_score`（含背景类）与 `bbox_pred`（类相关/类无关）。
 
-> *可放图位*：  
-> `![结构总览]({{ '/assets/img/2025-10-26/fasterrcnn-arch.png' | relative_url }})`
-
 ---
 
 ## 2. Backbone
@@ -48,6 +45,11 @@ Image → Backbone(ResNet) → Neck(FPN: P2…P6)
 - **Stem**：7×7 Conv (stride=2, out=64) → BN → ReLU → 3×3 MaxPool (s=2)
 - **Stages**：4 个 stage（Bottleneck 堆叠），常见层数 (3, 4, 6, 3)
 - **Bottleneck**：`1×1 降维 → 3×3 提特征 → 1×1 升维`，残差连接相加后 ReLU。
+
+### 2.2 一些个人理解
+- **输入**：(N, 3, H, W) 的图像张量（RGB）
+- **✅做**：卷积/归一化/激活/下采样 → 产生多尺度特征图（多层级语义）。浅层准定位，深层强语义，以提供给FPN使用
+- **输出**：多尺度特征图列表：[C2, C3, C4, C5]，形状为：(batch_size, Ci_ch, ⌈H/stride_i⌉, ⌈W/stride_i⌉)
 
 <figure style="max-width:720px;margin:0 auto;">
   <img src="{{ '/assets/img/ResNet_structure.png' | relative_url }}"
@@ -92,6 +94,11 @@ $$
         laterals[i - 1] = laterals[i - 1] + F.interpolate(laterals[i], size=size, **self.upsample_cfg)
 ```
 
+### 3.3 一些个人理解
+- **输入**：[C2, C3, C4, C5]
+- **✅做**：侧向 1×1 同通道 → 自顶向下上采样相加 → 3×3 平滑（可再扩展 P6/P7）
+- **输出**：金字塔特征：[P2, P3, P4, P5, (P6)]，形状为：(batch_size, 256, ⌈H/stride_i⌉, ⌈W/stride_i⌉)
+
 <figure style="max-width:720px;margin:0 auto;">
   <img src="{{ '/assets/img/FPN_details.png' | relative_url }}"
        alt="FPN 融合示意"
@@ -104,7 +111,7 @@ $$
 
 ---
 
-## 4. RPN
+## 4. RPN/RPN_Head（第一阶段的目标检测）
 
 <figure style="max-width:720px;margin:0 auto;">
   <img src="{{ '/assets/img/FPN_to_resnet.png' | relative_url }}"
@@ -183,6 +190,11 @@ def hard_nms(bboxes, scores, iou_thr=0.7, max_per_img=100):
 
 **常用超参**：`score_thr`（低分过滤）、`nms.iou_threshold=τ`、`max_per_img`（如 100），以及（RPN）`nms_pre`。
 
+### 4.5 一些个人理解
+- **输入**：金字塔特征 [P2, P3, P4, P5, (P6)]，每层形状 (N, D, H_l, W_l)，以及每位置锚数 A
+- **✅做**：1×1/3×3 卷积 → 产生 objectness（前景分数）与 bbox Δ → 解码→ 预筛(top-K) → NMS
+- **输出**：每层分类/回归特征图 + 合并后的 proposals（每图保留 R ≤ max_per_img 个）
+
 <figure style="max-width:720px;margin:0 auto;">
   <img src="{{ '/assets/img/nms.png' | relative_url }}"
        alt="FPN 融合示意"
@@ -193,7 +205,7 @@ def hard_nms(bboxes, scores, iou_thr=0.7, max_per_img=100):
 
 ---
 
-## 5. RoI / RCNN Head
+## 5. RoI/RCNN Head（目标检测的第二阶段）
 
 <figure style="max-width:720px;margin:0 auto;">
   <img src="{{ '/assets/img/man_on_horse.png' | relative_url }}"
@@ -241,6 +253,11 @@ $$
 ### 5.4 测试后处理
 - `multiclass_nms`：把 `(N,4K)` reshape 为 `(N,K,4)`，丢背景列，分类别做（Soft-）NMS，输出：  
   `det_bboxes:(M,4+1)`、`det_labels:(M,)`。
+
+### 5.5 一些个人理解
+- **输入**：RPN 给的 proposals（每图 𝑅 个）＋金字塔特征 [P2, P3, P4, P5, (P6)]
+- **✅做**：按尺度把每个框分配到对应层 → RoIAlign 得到定长特征 → 头部网络输出分类分数与框回归 Δ ，解码后做逐类 NMS
+- **输出**：每层分类/回归特征图 + 合并后的 proposals（每图保留 R ≤ max_per_img 个）
 
 ---
 
